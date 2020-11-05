@@ -141,9 +141,15 @@ open_text_file = partial(codecs.open, encoding="utf-8", errors="strict")
 UNICODE_BYTE_ORDER_MARK = "\uFEFF"
 
 
-def make_bag(
-    bag_dir, bag_info=None, processes=1, checksums=None, checksum=None, encoding="utf-8"
-):
+def sizeof_fmt(num, suffix="B"):
+    for unit in ["", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"]:
+        if abs(num) < 1024.0:
+            return "%3.1f %s%s" % (num, unit, suffix)
+        num /= 1024.0
+    return "%.1f %s%s" % (num, "Yi", suffix)
+
+
+def make_bag(bag_dir, bag_info=None, processes=1, checksums=None, checksum=None, encoding="utf-8"):
     """
     Convert a given directory into a bag. You can pass in arbitrary
     key/value pairs to put into the bag-info.txt metadata file as
@@ -152,9 +158,7 @@ def make_bag(
 
     if checksum is not None:
         warnings.warn(
-            _(
-                "The `checksum` argument for `make_bag` should be replaced with `checksums`"
-            ),
+            _("The `checksum` argument for `make_bag` should be replaced with `checksums`"),
             DeprecationWarning,
         )
         checksums = checksum
@@ -166,9 +170,7 @@ def make_bag(
     cwd = os.path.abspath(os.path.curdir)
 
     if cwd.startswith(bag_dir) and cwd != bag_dir:
-        raise RuntimeError(
-            _("Bagging a parent of the current directory is not supported")
-        )
+        raise RuntimeError(_("Bagging a parent of the current directory is not supported"))
 
     LOGGER.info(_("Creating bag for directory %s"), bag_dir)
 
@@ -189,8 +191,7 @@ def make_bag(
 
         if unbaggable:
             LOGGER.error(
-                _("Unable to write to the following directories and files:\n%s"),
-                unbaggable,
+                _("Unable to write to the following directories and files:\n%s"), unbaggable,
             )
             raise BagError(_("Missing permissions to move all files and directories"))
 
@@ -204,12 +205,9 @@ def make_bag(
                 )
             if unreadable_files:
                 LOGGER.error(
-                    _("The following files do not have read permissions:\n%s"),
-                    unreadable_files,
+                    _("The following files do not have read permissions:\n%s"), unreadable_files,
                 )
-            raise BagError(
-                _("Read permissions are required to calculate file fixities")
-            )
+            raise BagError(_("Read permissions are required to calculate file fixities"))
         else:
             LOGGER.info(_("Creating data directory"))
 
@@ -223,8 +221,7 @@ def make_bag(
                     continue
                 new_f = os.path.join(temp_data, f)
                 LOGGER.info(
-                    _("Moving %(source)s to %(destination)s"),
-                    {"source": f, "destination": new_f},
+                    _("Moving %(source)s to %(destination)s"), {"source": f, "destination": new_f},
                 )
                 os.rename(f, new_f)
 
@@ -255,12 +252,10 @@ def make_bag(
             if "Bagging-Date" not in bag_info:
                 bag_info["Bagging-Date"] = date.strftime(date.today(), "%Y-%m-%d")
             if "Bag-Software-Agent" not in bag_info:
-                bag_info["Bag-Software-Agent"] = "bagit.py v%s <%s>" % (
-                    VERSION,
-                    PROJECT_URL,
-                )
+                bag_info["Bag-Software-Agent"] = "bagit.py v%s <%s>" % (VERSION, PROJECT_URL,)
 
             bag_info["Payload-Oxum"] = "%s.%s" % (total_bytes, total_files)
+            bag_info["Bag-Size"] = "%s" % sizeof_fmt(total_bytes)
             _make_tag_file("bag-info.txt", bag_info)
 
             for c in checksums:
@@ -321,8 +316,7 @@ class Bag(object):
     @property
     def version(self):
         warnings.warn(
-            _("Use the Bag.version_info tuple instead of Bag.version"),
-            DeprecationWarning,
+            _("Use the Bag.version_info tuple instead of Bag.version"), DeprecationWarning,
         )
         return self._version
 
@@ -339,9 +333,7 @@ class Bag(object):
         required_tags = ("BagIt-Version", "Tag-File-Character-Encoding")
         missing_tags = [i for i in required_tags if i not in tags]
         if missing_tags:
-            raise BagError(
-                _("Missing required tag in bagit.txt: %s") % ", ".join(missing_tags)
-            )
+            raise BagError(_("Missing required tag in bagit.txt: %s") % ", ".join(missing_tags))
 
         # To avoid breaking existing code we'll leave self.version as the string
         # and parse it into a numeric version_info tuple. In version 2.0 we can
@@ -353,8 +345,7 @@ class Bag(object):
             self.version_info = tuple(int(i) for i in self._version.split(".", 1))
         except ValueError:
             raise BagError(
-                _("Bag version numbers must be MAJOR.MINOR numbers, not %s")
-                % self._version
+                _("Bag version numbers must be MAJOR.MINOR numbers, not %s") % self._version
             )
 
         if (0, 93) <= self.version_info <= (0, 95):
@@ -400,9 +391,7 @@ class Bag(object):
         # We compare the filenames after Unicode normalization so we can
         # reliably detect normalization changes after bag creation:
         files_on_fs = set(normalize_unicode(i) for i in self.payload_files())
-        files_in_manifest = set(
-            normalize_unicode(i) for i in self.payload_entries().keys()
-        )
+        files_in_manifest = set(normalize_unicode(i) for i in self.payload_entries().keys())
 
         if self.version_info >= (0, 97):
             files_in_manifest.update(self.missing_optional_tagfiles())
@@ -439,9 +428,7 @@ class Bag(object):
                 # returned with the directory structure relative to the base
                 # directory rather than the
                 normalized_f = os.path.normpath(f)
-                rel_path = os.path.relpath(
-                    os.path.join(dirpath, normalized_f), start=self.path
-                )
+                rel_path = os.path.relpath(os.path.join(dirpath, normalized_f), start=self.path)
 
                 self.normalized_filesystem_names[normalize_unicode(rel_path)] = rel_path
                 yield rel_path
@@ -450,9 +437,7 @@ class Bag(object):
         """Return a dictionary of items """
         # Don't use dict comprehension (compatibility with Python < 2.7)
         return dict(
-            (key, value)
-            for (key, value) in self.entries.items()
-            if key.startswith("data" + os.sep)
+            (key, value) for (key, value) in self.entries.items() if key.startswith("data" + os.sep)
         )
 
     def save(self, processes=1, manifests=False):
@@ -475,16 +460,13 @@ class Bag(object):
 
         if not os.access(self.path, os.R_OK | os.W_OK | os.X_OK):
             raise BagError(
-                _("Cannot save bag to non-existent or inaccessible directory %s")
-                % self.path
+                _("Cannot save bag to non-existent or inaccessible directory %s") % self.path
             )
 
         unbaggable = _can_bag(self.path)
         if unbaggable:
             LOGGER.error(
-                _(
-                    "Missing write permissions for the following directories and files:\n%s"
-                ),
+                _("Missing write permissions for the following directories and files:\n%s"),
                 unbaggable,
             )
             raise BagError(_("Missing permissions to move all files and directories"))
@@ -498,12 +480,9 @@ class Bag(object):
                 )
             if unreadable_files:
                 LOGGER.error(
-                    _("The following files do not have read permissions:\n%s"),
-                    unreadable_files,
+                    _("The following files do not have read permissions:\n%s"), unreadable_files,
                 )
-            raise BagError(
-                _("Read permissions are required to calculate file fixities")
-            )
+            raise BagError(_("Read permissions are required to calculate file fixities"))
 
         # Change working directory to bag directory so helper functions work
         old_dir = os.path.abspath(os.path.curdir)
@@ -561,9 +540,7 @@ class Bag(object):
         fetch_file_path = os.path.join(self.path, "fetch.txt")
 
         if isfile(fetch_file_path):
-            with open_text_file(
-                fetch_file_path, "r", encoding=self.encoding
-            ) as fetch_file:
+            with open_text_file(fetch_file_path, "r", encoding=self.encoding) as fetch_file:
                 for line in fetch_file:
                     url, file_size, filename = line.strip().split(None, 2)
 
@@ -604,9 +581,7 @@ class Bag(object):
 
         self.validate_fetch()
 
-        self._validate_contents(
-            processes=processes, fast=fast, completeness_only=completeness_only
-        )
+        self._validate_contents(processes=processes, fast=fast, completeness_only=completeness_only)
 
         return True
 
@@ -635,17 +610,11 @@ class Bag(object):
                 search = "tagmanifest-"
             else:
                 search = "manifest-"
-            alg = (
-                os.path.basename(manifest_filename)
-                .replace(search, "")
-                .replace(".txt", "")
-            )
+            alg = os.path.basename(manifest_filename).replace(search, "").replace(".txt", "")
             if alg not in self.algorithms:
                 self.algorithms.append(alg)
 
-            with open_text_file(
-                manifest_filename, "r", encoding=self.encoding
-            ) as manifest_file:
+            with open_text_file(manifest_filename, "r", encoding=self.encoding) as manifest_file:
                 if manifest_file.encoding.startswith("UTF"):
                     # We'll check the first character to see if it's a BOM:
                     if manifest_file.read(1) == UNICODE_BYTE_ORDER_MARK:
@@ -677,9 +646,7 @@ class Bag(object):
                     # Format is FILENAME *CHECKSUM
                     if len(entry) != 2:
                         LOGGER.error(
-                            _(
-                                "%(bag)s: Invalid %(algorithm)s manifest entry: %(line)s"
-                            ),
+                            _("%(bag)s: Invalid %(algorithm)s manifest entry: %(line)s"),
                             {"bag": self, "algorithm": alg, "line": line},
                         )
                         continue
@@ -690,13 +657,8 @@ class Bag(object):
 
                     if self._path_is_dangerous(entry_path):
                         raise BagError(
-                            _(
-                                'Path "%(payload_file)s" in manifest "%(manifest_file)s" is unsafe'
-                            )
-                            % {
-                                "payload_file": entry_path,
-                                "manifest_file": manifest_file.name,
-                            }
+                            _('Path "%(payload_file)s" in manifest "%(manifest_file)s" is unsafe')
+                            % {"payload_file": entry_path, "manifest_file": manifest_file.name,}
                         )
 
                     entry_hashes = self.entries.setdefault(entry_path, {})
@@ -745,9 +707,7 @@ class Bag(object):
         data_dir_path = os.path.join(self.path, "data")
 
         if not isdir(data_dir_path):
-            raise BagValidationError(
-                _("Expected data directory %s does not exist") % data_dir_path
-            )
+            raise BagValidationError(_("Expected data directory %s does not exist") % data_dir_path)
 
     def _validate_structure_tag_files(self):
         # Note: we deviate somewhat from v0.96 of the spec in that it allows
@@ -756,9 +716,7 @@ class Bag(object):
         if not list(self.manifest_files()):
             raise BagValidationError(_("No manifest files found"))
         if "bagit.txt" not in os.listdir(self.path):
-            raise BagValidationError(
-                _('Expected %s to contain "bagit.txt"') % self.path
-            )
+            raise BagValidationError(_('Expected %s to contain "bagit.txt"') % self.path)
 
     def validate_fetch(self):
         """Validate the fetch.txt file
@@ -899,9 +857,7 @@ class Bag(object):
             for alg, computed_hash in f_hashes.items():
                 stored_hash = hashes[alg]
                 if stored_hash.lower() != computed_hash:
-                    e = ChecksumMismatch(
-                        rel_path, alg, stored_hash.lower(), computed_hash
-                    )
+                    e = ChecksumMismatch(rel_path, alg, stored_hash.lower(), computed_hash)
                     LOGGER.warning(force_unicode(e))
                     errors.append(e)
 
@@ -919,9 +875,7 @@ class Bag(object):
         with open(bagit_file_path, "rb") as bagit_file:
             first_line = bagit_file.read(4)
             if first_line.startswith(codecs.BOM_UTF8):
-                raise BagValidationError(
-                    _("bagit.txt must not contain a byte-order mark")
-                )
+                raise BagValidationError(_("bagit.txt must not contain a byte-order mark"))
 
     def _path_is_dangerous(self, path):
         """
@@ -993,9 +947,7 @@ class ChecksumMismatch(ManifestErrorDetail):
 
 class FileMissing(ManifestErrorDetail):
     def __str__(self):
-        return _(
-            "%s exists in manifest but was not found on filesystem"
-        ) % force_unicode(self.path)
+        return _("%s exists in manifest but was not found on filesystem") % force_unicode(self.path)
 
 
 class UnexpectedFile(ManifestErrorDetail):
@@ -1016,9 +968,10 @@ class FileNormalizationConflict(BagError):
         self.file_b = file_b
 
     def __str__(self):
-        return _(
-            'Unicode normalization conflict for file "%(file_a)s" and "%(file_b)s"'
-        ) % {"file_a": self.file_a, "file_b": self.file_b}
+        return _('Unicode normalization conflict for file "%(file_a)s" and "%(file_b)s"') % {
+            "file_a": self.file_a,
+            "file_b": self.file_b,
+        }
 
 
 def posix_multiprocessing_worker_initializer():
@@ -1106,8 +1059,7 @@ def get_hashers(algorithms):
             hasher = hashlib.new(alg)
         except ValueError:
             LOGGER.warning(
-                _("Disabling requested hash algorithm %s: hashlib does not support it"),
-                alg,
+                _("Disabling requested hash algorithm %s: hashlib does not support it"), alg,
             )
             continue
 
@@ -1115,9 +1067,7 @@ def get_hashers(algorithms):
 
     if not hashers:
         raise ValueError(
-            _(
-                "Unable to continue: hashlib does not support any of the requested algorithms!"
-            )
+            _("Unable to continue: hashlib does not support any of the requested algorithms!")
         )
 
     return hashers
@@ -1209,10 +1159,7 @@ def _parse_tags(tag_file):
             if ":" not in line:
                 raise BagValidationError(
                     _("%(filename)s contains invalid tag: %(line)s")
-                    % {
-                        "line": line.strip(),
-                        "filename": os.path.basename(tag_file.name),
-                    }
+                    % {"line": line.strip(), "filename": os.path.basename(tag_file.name),}
                 )
 
             parts = line.strip().split(":", 1)
@@ -1410,8 +1357,7 @@ def generate_manifest_lines(filename, algorithms=DEFAULT_CHECKSUMS):
 
     # We'll generate a list of results in roughly manifest format but prefixed with the algorithm:
     results = [
-        (alg, hasher.hexdigest(), decoded_filename, total_bytes)
-        for alg, hasher in hashers.items()
+        (alg, hasher.hexdigest(), decoded_filename, total_bytes) for alg, hasher in hashers.items()
     ]
 
     return results
@@ -1468,9 +1414,7 @@ def _make_parser():
         type=int,
         dest="processes",
         default=1,
-        help=_(
-            "Use multiple processes to calculate checksums faster (default: %(default)s)"
-        ),
+        help=_("Use multiple processes to calculate checksums faster (default: %(default)s)"),
     )
     parser.add_argument("--log", help=_("The name of the log file (default: stdout)"))
     parser.add_argument(
@@ -1482,8 +1426,7 @@ def _make_parser():
         "--validate",
         action="store_true",
         help=_(
-            "Validate existing bags in the provided directories instead of"
-            " creating new ones"
+            "Validate existing bags in the provided directories instead of" " creating new ones"
         ),
     )
     parser.add_argument(
@@ -1507,10 +1450,7 @@ def _make_parser():
 
     checksum_args = parser.add_argument_group(
         _("Checksum Algorithms"),
-        _(
-            "Select the manifest algorithms to be used when creating bags"
-            " (default=%s)"
-        )
+        _("Select the manifest algorithms to be used when creating bags" " (default=%s)")
         % ", ".join(DEFAULT_CHECKSUMS),
     )
 
@@ -1588,9 +1528,7 @@ def main():
                 else:
                     LOGGER.info(_("%s is valid"), bag_dir)
             except BagError as e:
-                LOGGER.error(
-                    _("%(bag)s is invalid: %(error)s"), {"bag": bag_dir, "error": e}
-                )
+                LOGGER.error(_("%(bag)s is invalid: %(error)s"), {"bag": bag_dir, "error": e})
                 rc = 1
 
         # make the bag
